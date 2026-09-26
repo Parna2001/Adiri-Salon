@@ -79,6 +79,7 @@
     background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-size: 12px;
   }
   .chip.warn { color: var(--warn); border-color: var(--warn); }
+  .chip:empty { display: none; }
   button, select, input[type="search"] {
     font: inherit; color: var(--text-primary); background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
@@ -192,9 +193,11 @@
   </header>
 
   <div class="card" id="error">
-    <h2>Couldn't load dashboard_data.json</h2>
-    <p class="desc">Run <code>python dashboard_data.py</code> in this folder, then reload. Or pick the generated file manually:</p>
+    <h2>Load your customer data</h2>
+    <p class="desc">Choose the <code>dashboard_data.json</code> file made by <code>python dashboard_data.py</code>.
+      It is read in your browser only and is never uploaded.</p>
     <input type="file" id="picker" accept=".json,application/json" aria-label="Choose dashboard_data.json">
+    <p class="desc" id="picker-error" hidden></p>
   </div>
 
   <main id="app" hidden>
@@ -310,7 +313,16 @@
   }
   $("picker").addEventListener("change", async (e) => {
     const f = e.target.files[0];
-    if (f) start(JSON.parse(await f.text()));
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (!d.kpis || !d.customers) throw new Error("not dashboard data");
+      $("picker-error").hidden = true;
+      start(d);
+    } catch (err) {
+      $("picker-error").hidden = false;
+      $("picker-error").textContent = "That file isn't a dashboard_data.json made by dashboard_data.py.";
+    }
   });
   load().then(start).catch(() => { $("error").classList.add("show"); $("subtitle").textContent = ""; });
 

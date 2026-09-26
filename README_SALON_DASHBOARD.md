@@ -35,6 +35,13 @@ python -m http.server 8000
 # then browse to http://localhost:8000/dashboard.html
 ```
 
+### Online (GitHub Pages)
+
+The page is published at **https://parna2001.github.io/Adiri-Salon/** by `.github/workflows/pages.yml`
+on every push to `main` that changes `dashboard.html`. Only that one page is published: no customer data
+is online. Open the link, click **Choose File** and pick your local `dashboard_data.json`; it's read in your
+browser and never uploaded.
+
 If the top of the page says **"Not today's data"**, the numbers were generated on an earlier day. Re-run
 `dashboard_data.py` and reload.
 
