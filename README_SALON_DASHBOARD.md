@@ -1,7 +1,12 @@
 # Salon Engagement Dashboard
 
 Shows customer counts, missing data, birthday/anniversary charts, upcoming occasions and a searchable
-customer table, built from `Salon Customers Database - Pradip Ray(Sheet1).xlsx`.
+customer table, built from a salon customer spreadsheet (`Salon Customers Database*.xlsx`).
+
+> **Public code, private data.** This repo and the live page are public. The spreadsheet and the
+> `dashboard_data.json` made from it are git-ignored and never committed. Anyone who clones the repo or
+> opens the live link must supply their own `dashboard_data.json` locally, using the **Choose File**
+> button, to see real data.
 
 | File | Role |
 |---|---|
@@ -35,12 +40,26 @@ python -m http.server 8000
 # then browse to http://localhost:8000/dashboard.html
 ```
 
+If neither data file is present, for example in a fresh clone, the page shows a **Choose File** button
+instead. Pick a `dashboard_data.json` to load it.
+
 ### Online (GitHub Pages)
 
-The page is published at **https://parna2001.github.io/Adiri-Salon/** by `.github/workflows/pages.yml`
-on every push to `main` that changes `dashboard.html`. Only that one page is published: no customer data
-is online. Open the link, click **Choose File** and pick your local `dashboard_data.json`; it's read in your
-browser and never uploaded.
+Live page: **https://parna2001.github.io/Adiri-Salon/dashboard.html**
+
+The live page contains the dashboard code only; no customer data is published. On the live site it
+doesn't even request a data file. It opens straight to the **Choose File** button:
+
+1. On your own computer, run `python dashboard_data.py` to create `dashboard_data.json`.
+2. Open the live link and click **Choose File**.
+3. Pick that `dashboard_data.json`. The dashboard appears.
+
+The file is read by your browser only. It is never uploaded, and it is gone once you close or reload the tab.
+If you pick the wrong file, the page tells you and waits for another.
+
+`.github/workflows/pages.yml` republishes the page whenever `dashboard.html` changes on `main`. It applies
+when Settings → Pages → Source is set to **GitHub Actions**, which also makes the dashboard the site's
+front page.
 
 If the top of the page says **"Not today's data"**, the numbers were generated on an earlier day. Re-run
 `dashboard_data.py` and reload.
@@ -58,4 +77,4 @@ If the top of the page says **"Not today's data"**, the numbers were generated o
   are listed under "Data quality notes" at the bottom of the dashboard.
 
 `dashboard_data.json`, `dashboard_data.js` and the Excel file hold customers' names and phone numbers.
-They are listed in `.gitignore`; don't put them anywhere public.
+They are listed in `.gitignore` and must never be committed (don't `git add -f` them) or shared publicly.

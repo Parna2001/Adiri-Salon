@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salon Engagement Dashboard</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     color-scheme: light;
@@ -260,8 +261,6 @@
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
 
-<!-- Written by dashboard_data.py; lets the page work when opened straight from disk. -->
-<script src="dashboard_data.js"></script>
 <script>
 (() => {
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -301,14 +300,24 @@
   const hideTip = () => tip.classList.remove("show");
 
   /* ---------- loading ---------- */
+  // Opened from disk: read dashboard_data.js (written by dashboard_data.py; fetch() of files is blocked there).
+  // Served locally (python -m http.server): fetch dashboard_data.json.
+  // On GitHub Pages the data is never published, so go straight to the file picker without requesting it.
   async function load() {
-    if (location.protocol.startsWith("http")) {
+    if (location.protocol === "file:") {
+      await new Promise((resolve) => {
+        const s = document.createElement("script");
+        s.src = "dashboard_data.js";
+        s.onload = s.onerror = resolve;
+        document.head.appendChild(s);
+      });
+      if (window.DASHBOARD_DATA) return window.DASHBOARD_DATA;
+    } else if (!location.hostname.endsWith("github.io")) {
       try {
         const r = await fetch("dashboard_data.json", { cache: "no-store" });
         if (r.ok) return r.json();
-      } catch (e) { /* fall through to dashboard_data.js */ }
+      } catch (e) { /* show the file picker */ }
     }
-    if (window.DASHBOARD_DATA) return window.DASHBOARD_DATA;
     throw new Error("no data");
   }
   $("picker").addEventListener("change", async (e) => {
