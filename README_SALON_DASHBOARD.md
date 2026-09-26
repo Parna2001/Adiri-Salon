@@ -3,16 +3,17 @@
 Shows customer counts, missing data, birthday/anniversary charts, upcoming occasions and a searchable
 customer table, built from a salon customer spreadsheet (`Salon Customers Database*.xlsx`).
 
-> **Public code, private data.** This repo and the live page are public. The spreadsheet and the
-> `dashboard_data.json` made from it are git-ignored and never committed. Anyone who clones the repo or
-> opens the live link must supply their own `dashboard_data.json` locally, using the **Choose File**
-> button, to see real data.
+> **Public code, private data.** This repo and the live page are public. The spreadsheet and the plain
+> `dashboard_data.json` made from it are git-ignored and never committed. The live site carries only an
+> encrypted copy (`dashboard_data.enc.json`) that opens with the dashboard password. Anyone without the
+> password sees nothing unless they load their own `dashboard_data.json` with the **Choose File** button.
 
 | File | Role |
 |---|---|
 | `dashboard_data.py` | Reads the Excel file, cleans it, and writes `dashboard_data.json` |
 | `dashboard_data.json` | All numbers and customer rows the dashboard shows (generated, git-ignored) |
 | `dashboard_data.js` | The same data as a script file, so the page opens from disk (generated, git-ignored) |
+| `dashboard_data.enc.json` | The same data, encrypted with `DASHBOARD_PASSWORD`, for the live site (generated, committed) |
 | `dashboard.html` | The dashboard (one file, no internet or extra libraries needed; contains no customer data) |
 
 ## Refresh the data
@@ -23,10 +24,11 @@ Whenever the Excel file changes (and ideally each morning, since "upcoming" is r
 python dashboard_data.py
 ```
 
-That rewrites `dashboard_data.json` and `dashboard_data.js`.
+That rewrites `dashboard_data.json` and `dashboard_data.js`, and, if `DASHBOARD_PASSWORD` is set in `.env`,
+`dashboard_data.enc.json`.
 Options: `--input other.xlsx` for a different workbook, `--today 2026-10-01` to preview another date.
 
-It needs only `pandas` and `openpyxl`, which are already installed in this project.
+It needs `pandas` and `openpyxl`, plus `cryptography` for the encrypted copy. All are already installed here.
 
 ## Open the dashboard
 
@@ -45,21 +47,36 @@ instead. Pick a `dashboard_data.json` to load it.
 
 ### Online (GitHub Pages)
 
-Live page: **https://parna2001.github.io/Adiri-Salon/dashboard.html**
+Live page: **https://parna2001.github.io/Adiri-Salon/**
 
-The live page contains the dashboard code only; no customer data is published. On the live site it
-doesn't even request a data file. It opens straight to the **Choose File** button:
+The live site holds the customer data **encrypted** (AES-256-GCM, key derived from your password with
+PBKDF2-SHA256, 600,000 rounds). The page asks for the password, decrypts the data in your browser and shows
+the full dashboard. The password never leaves your device, and reloading the page locks it again.
 
-1. On your own computer, run `python dashboard_data.py` to create `dashboard_data.json`.
-2. Open the live link and click **Choose File**.
-3. Pick that `dashboard_data.json`. The dashboard appears.
+**One-time setup:** add a strong password (12+ characters; a few random words works well) to `.env`:
 
-The file is read by your browser only. It is never uploaded, and it is gone once you close or reload the tab.
-If you pick the wrong file, the page tells you and waits for another.
+```
+DASHBOARD_PASSWORD=your-long-password-here
+```
 
-`.github/workflows/pages.yml` republishes the page whenever `dashboard.html` changes on `main`. It applies
-when Settings → Pages → Source is set to **GitHub Actions**, which also makes the dashboard the site's
-front page.
+`.env` is git-ignored, so the password is never committed. Share it only with people who may see customer data.
+
+**To update the live data** after the spreadsheet changes:
+
+```bash
+python dashboard_data.py
+git add dashboard_data.enc.json
+git commit -m "Update dashboard data"
+git push
+```
+
+The site redeploys within a minute or two (`.github/workflows/pages.yml`).
+
+- **Changing the password:** change it in `.env`, re-run the script and push. The old password stops working
+  for the new file, but anyone who downloaded an older encrypted file can still open that copy with the old password.
+- **Security depends on the password.** The encrypted file is public, so a short or guessable password could
+  be cracked offline. Use a long one.
+- Without the password, you can still load a local `dashboard_data.json` with **Choose File** on the same page.
 
 If the top of the page says **"Not today's data"**, the numbers were generated on an earlier day. Re-run
 `dashboard_data.py` and reload.

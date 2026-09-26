@@ -8,12 +8,19 @@ Usage:
 Re-run it whenever the Excel file changes. It also writes dashboard_data.js, a copy of the same data
 that dashboard.html loads so the dashboard opens with a plain double-click (see README_SALON_DASHBOARD.md).
 Both generated files hold real customer details and are git-ignored.
+
+If DASHBOARD_PASSWORD is set in .env, it also writes dashboard_data.enc.json: the same data encrypted
+(AES-256-GCM, key derived from the password with PBKDF2-SHA256). That file is safe to commit; the live
+GitHub Pages dashboard asks for the password and decrypts it in the browser.
 """
 
 import argparse
+import base64
 import calendar
 import json
+import os
 import re
+import secrets
 import sys
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -24,6 +31,9 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 OUTPUT_JSON = HERE / "dashboard_data.json"
 OUTPUT_JS = HERE / "dashboard_data.js"
+OUTPUT_ENC = HERE / "dashboard_data.enc.json"
+PBKDF2_ITERATIONS = 600_000  # OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
+MIN_PASSWORD_LENGTH = 12
 
 MONTHS = list(calendar.month_name)[1:]  # January..December
 MONTH_LOOKUP = {}
@@ -365,6 +375,36 @@ def write_js_copy(json_text):
     OUTPUT_JS.write_text(f"window.DASHBOARD_DATA = {json_text};\n", encoding="utf-8")
 
 
+def write_encrypted_copy(json_text, password):
+    """Encrypt the data for publishing. dashboard.html reverses this with the browser's Web Crypto API."""
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+    salt, iv = secrets.token_bytes(16), secrets.token_bytes(12)
+    key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=PBKDF2_ITERATIONS).derive(
+        password.encode("utf-8")
+    )
+    ciphertext = AESGCM(key).encrypt(iv, json_text.encode("utf-8"), None)  # includes the 16-byte GCM tag
+    b64 = lambda b: base64.b64encode(b).decode("ascii")
+    payload = {"v": 1, "kdf": "PBKDF2-SHA256", "iterations": PBKDF2_ITERATIONS, "cipher": "AES-256-GCM",
+               "salt": b64(salt), "iv": b64(iv), "data": b64(ciphertext)}
+    OUTPUT_ENC.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def dashboard_password():
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(HERE / ".env")
+    except ImportError:
+        pass
+    password = os.environ.get("DASHBOARD_PASSWORD", "")
+    if password and len(password) < MIN_PASSWORD_LENGTH:
+        sys.exit(f"DASHBOARD_PASSWORD must be at least {MIN_PASSWORD_LENGTH} characters. Nothing was encrypted.")
+    return password
+
+
 def find_excel():
     matches = sorted(HERE.glob("Salon Customers Database*.xlsx"))
     if not matches:
@@ -378,9 +418,12 @@ def main():
     ap.add_argument("--today", type=date.fromisoformat, default=date.today(), help="YYYY-MM-DD, defaults to today")
     args = ap.parse_args()
 
+    password = dashboard_password()
     data = build(args.input or find_excel(), args.today)
     OUTPUT_JSON.write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
     write_js_copy(json.dumps(data, ensure_ascii=False))
+    if password:
+        write_encrypted_copy(json.dumps(data, ensure_ascii=False), password)
 
     k = data["kpis"]
     print(f"Wrote {OUTPUT_JSON.name}: {k['total_customers']} customers, as of {data['meta']['as_of']}")
@@ -389,6 +432,10 @@ def main():
     print(f"  {len(data['upcoming_30_days'])} birthdays/anniversaries in the next 30 days; "
           f"{len(data['data_quality'])} data-quality notes")
     print(f"  also wrote {OUTPUT_JS.name} (lets dashboard.html open straight from disk)")
+    if password:
+        print(f"  encrypted copy: {OUTPUT_ENC.name} (commit and push this one to update the live site)")
+    else:
+        print(f"  no DASHBOARD_PASSWORD in .env, so {OUTPUT_ENC.name} was not updated")
 
 
 if __name__ == "__main__":

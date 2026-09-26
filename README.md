@@ -1,11 +1,11 @@
 # RAG experiments and salon customer dashboard
 
-> **This repository is public. It contains code only, never real customer data.**
-> The dashboard's code and page are public (live at https://parna2001.github.io/Adiri-Salon/dashboard.html),
-> but the customer spreadsheet and the `dashboard_data.json` generated from it are never committed.
-> Whether you clone the repo or open the live link, you see real data only by supplying your own
-> `dashboard_data.json` through the page's **Choose File** button. The file is read in your browser and is
-> never uploaded anywhere.
+> **This repository is public. Real customer data is never committed in readable form.**
+> The dashboard's code and page are public (live at https://parna2001.github.io/Adiri-Salon/). The customer
+> spreadsheet and the plain `dashboard_data.json` generated from it are never committed. The only copy of
+> the data in the repo is `dashboard_data.enc.json`, which is encrypted and useless without the dashboard
+> password. To see real data you need either that password or your own `dashboard_data.json`, loaded
+> through the page's **Choose File** button. Either way it is decrypted or read in your browser only.
 
 Two small projects in one repo:
 
@@ -33,7 +33,7 @@ Similarity search returns only the closest few records, so it is weak for counti
 ```bash
 python -m venv .venv && .venv\Scripts\activate      # Python 3.14 per pyproject.toml
 pip install -r requirements.txt
-pip install chromadb langchain-huggingface sentence-transformers pypdf pandas openpyxl
+pip install chromadb langchain-huggingface sentence-transformers pypdf pandas openpyxl cryptography
 copy .env.example .env                              # then put your ANTHROPIC_API_KEY in .env
 ```
 
@@ -68,12 +68,14 @@ Month columns accept full or short names in any case (`June`, `jun`). Extra colu
 | Public (in this repo) | Never committed (git-ignored, stays on your machine) |
 |---|---|
 | Dashboard code and page (`dashboard.html`, `dashboard_data.py`) | Customer spreadsheets (`*.xlsx`, `*.xls`, `*.csv`) |
-| Notebook, READMEs, dependency files | Generated data (`dashboard_data.json`, `dashboard_data.js`) |
-| `.env.example` (variable names only) | `.env` (API keys) |
+| `dashboard_data.enc.json` (encrypted, needs the password) | Plain generated data (`dashboard_data.json`, `dashboard_data.js`) |
+| Notebook, READMEs, dependency files | `.env` (API keys and the dashboard password) |
+| `.env.example` (variable names only) | |
 
 - **Cloned the repo?** You get the code without any data. Add your own spreadsheet, run
   `python dashboard_data.py`, then open `dashboard.html`, or use **Choose File** to load the JSON.
-- **Visiting the live page?** It is an empty shell until you click **Choose File** and pick a
-  `dashboard_data.json` from your own computer. Nothing is uploaded, and reloading the page clears it.
+- **Visiting the live page?** It asks for the dashboard password and decrypts the data in your browser.
+  The password is never sent anywhere, and reloading the page locks it again. Without the password you can
+  still load your own `dashboard_data.json` with **Choose File**.
 - **Contributing?** Run `git status` before every commit and make sure none of the right-hand files appear.
   Never use `git add -f` on them.

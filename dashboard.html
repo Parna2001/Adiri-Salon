@@ -178,6 +178,12 @@
   #error { display: none; }
   #error.show { display: block; }
   #error input { margin-top: 10px; }
+  .unlock-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .unlock-row input { flex: 1 1 220px; min-width: 0; max-width: 360px; font: inherit; color: var(--text-primary);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  .unlock-row input, .unlock-row button { margin-top: 10px; }
+  .form-error { color: var(--warn); }
+  #error .or { margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -194,11 +200,24 @@
   </header>
 
   <div class="card" id="error">
-    <h2>Load your customer data</h2>
-    <p class="desc">Choose the <code>dashboard_data.json</code> file made by <code>python dashboard_data.py</code>.
-      It is read in your browser only and is never uploaded.</p>
+    <form id="unlock" hidden>
+      <h2>Enter the dashboard password</h2>
+      <p class="desc">The customer data on this site is encrypted. It is decrypted in your browser; the password
+        is never sent anywhere.</p>
+      <div class="unlock-row">
+        <input type="password" id="pw" autocomplete="current-password" aria-label="Dashboard password" required>
+        <button type="submit" id="pw-go">Unlock</button>
+      </div>
+      <p class="desc form-error" id="pw-error" hidden></p>
+      <p class="desc or">Or load a <code>dashboard_data.json</code> file instead:</p>
+    </form>
+    <div id="picker-intro">
+      <h2>Load your customer data</h2>
+      <p class="desc">Choose the <code>dashboard_data.json</code> file made by <code>python dashboard_data.py</code>.
+        It is read in your browser only and is never uploaded.</p>
+    </div>
     <input type="file" id="picker" accept=".json,application/json" aria-label="Choose dashboard_data.json">
-    <p class="desc" id="picker-error" hidden></p>
+    <p class="desc form-error" id="picker-error" hidden></p>
   </div>
 
   <main id="app" hidden>
@@ -302,7 +321,16 @@
   /* ---------- loading ---------- */
   // Opened from disk: read dashboard_data.js (written by dashboard_data.py; fetch() of files is blocked there).
   // Served locally (python -m http.server): fetch dashboard_data.json.
-  // On GitHub Pages the data is never published, so go straight to the file picker without requesting it.
+  // Otherwise (GitHub Pages, where plain data is never published): fetch the encrypted
+  // dashboard_data.enc.json and ask for the password. Failing all of that, show the file picker.
+  let encrypted = null;
+  async function fetchJson(url) {
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      if (r.ok) return await r.json();
+    } catch (e) { /* not available */ }
+    return null;
+  }
   async function load() {
     if (location.protocol === "file:") {
       await new Promise((resolve) => {
@@ -312,14 +340,44 @@
         document.head.appendChild(s);
       });
       if (window.DASHBOARD_DATA) return window.DASHBOARD_DATA;
-    } else if (!location.hostname.endsWith("github.io")) {
-      try {
-        const r = await fetch("dashboard_data.json", { cache: "no-store" });
-        if (r.ok) return r.json();
-      } catch (e) { /* show the file picker */ }
+      throw new Error("no data");
     }
-    throw new Error("no data");
+    if (!location.hostname.endsWith("github.io")) {
+      const plain = await fetchJson("dashboard_data.json");
+      if (plain) return plain;
+    }
+    encrypted = await fetchJson("dashboard_data.enc.json");
+    throw new Error(encrypted ? "locked" : "no data");
   }
+
+  const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function decrypt(enc, password) {
+    if (enc.v !== 1 || !crypto.subtle) throw new Error("unsupported");
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", hash: "SHA-256", salt: fromB64(enc.salt), iterations: enc.iterations },
+      base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(enc.iv) }, key, fromB64(enc.data));
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+  $("unlock").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("pw-go"), err = $("pw-error");
+    btn.disabled = true; btn.textContent = "Unlocking…"; err.hidden = true;
+    try {
+      const d = await decrypt(encrypted, $("pw").value);
+      $("pw").value = "";
+      start(d);
+    } catch (x) {
+      err.hidden = false;
+      err.textContent = x.message === "unsupported"
+        ? "This browser can't decrypt the data. Try a current Chrome, Edge, Firefox or Safari."
+        : "Wrong password. Try again.";
+      $("pw").select();
+    } finally {
+      btn.disabled = false; btn.textContent = "Unlock";
+    }
+  });
   $("picker").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -333,7 +391,15 @@
       $("picker-error").textContent = "That file isn't a dashboard_data.json made by dashboard_data.py.";
     }
   });
-  load().then(start).catch(() => { $("error").classList.add("show"); $("subtitle").textContent = ""; });
+  load().then(start).catch(() => {
+    $("error").classList.add("show");
+    $("subtitle").textContent = "";
+    if (encrypted) {
+      $("unlock").hidden = false;
+      $("picker-intro").hidden = true;
+      $("pw").focus();
+    }
+  });
 
   /* ---------- bar chart ---------- */
   function niceMax(v) {

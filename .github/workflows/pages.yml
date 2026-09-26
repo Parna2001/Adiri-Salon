@@ -1,11 +1,11 @@
-# Publishes dashboard.html to GitHub Pages as the site's index page.
-# Only that one file is deployed; customer data is never part of the site (it's loaded in the browser).
+# Publishes dashboard.html to GitHub Pages as the site's index page, plus dashboard_data.enc.json:
+# the customer data encrypted with a password (see dashboard_data.py). Plain customer data is never deployed.
 name: Deploy dashboard to GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: [dashboard.html, .github/workflows/pages.yml]
+    paths: [dashboard.html, dashboard_data.enc.json, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +30,7 @@ jobs:
           mkdir _site
           cp dashboard.html _site/index.html
           cp dashboard.html _site/dashboard.html
+          if [ -f dashboard_data.enc.json ]; then cp dashboard_data.enc.json _site/; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
