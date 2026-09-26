@@ -1,0 +1,52 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and environment variables (keep .env.example, which has no real values)
+.env
+.env.*
+!.env.example
+
+# Real customer data: never commit
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+dashboard_data.json
+dashboard_data.js
+
+# Local-only files
+# Jira connectivity check that uses company credentials
+test_api.py
+# Notes for a separate Jira dashboard, not this project
+README_DASHBOARD.md
+.claude/
+
+# Caches and vector-store data
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+chroma/
+chroma_db/
+.chroma/
+*.sqlite3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Left out of the public repo
+RAG_Tutorial
+Rag pdf 1.pdf
